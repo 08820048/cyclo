@@ -14,6 +14,7 @@ final class StageController {
     private let preferences: Preferences
     private let store = JournalStore.default
     private let backdrop = BackdropWindows()
+    private let menuBarCover = MenuBarCover()
     private var journal: SessionJournal?
     private var stagedWindow: AXUIElement?
     private var askedForAccessibility = false
@@ -75,6 +76,13 @@ final class StageController {
             }
         }
 
+        // Last, so the menus it reads are the target's, after everything else has settled.
+        if config.cleanMenuBar, let target {
+            menuBarCover.show(.init(appName: target.localizedName ?? "", menus: MenuBarCover.menuTitles(of: target.processIdentifier),
+                                    backdrop: config.backdrop, fixedStatus: config.fixedStatus))
+            if !WindowSizer.isTrusted { notes.append("菜单栏只显示了 App 名:授予辅助功能权限后才能显示完整菜单") }
+        }
+
         target?.activate()
         onChange?()
     }
@@ -84,6 +92,7 @@ final class StageController {
         guard isActive || journal != nil else { return }
         let target = journal?.targetPID.flatMap { NSRunningApplication(processIdentifier: $0) }
         if let journal { Self.restore(journal, window: stagedWindow, waiting: waiting) }
+        menuBarCover.hide()
         backdrop.hide()
         store.clear()
         journal = nil
@@ -103,7 +112,11 @@ final class StageController {
     }
 
     func preferencesChanged() {
-        if isActive { backdrop.update(preferences.scene.backdrop) }
+        if isActive {
+            let scene = preferences.scene
+            backdrop.update(scene.backdrop)
+            if menuBarCover.isShowing { menuBarCover.update(backdrop: scene.backdrop, fixedStatus: scene.fixedStatus) }
+        }
         onChange?()
     }
 

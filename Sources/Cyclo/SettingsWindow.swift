@@ -57,6 +57,17 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("干净菜单栏", isOn: scene.cleanMenuBar)
+                Toggle("固定时间 9:41 与满电", isOn: scene.fixedStatus)
+                    .disabled(!preferences.scene.cleanMenuBar)
+            } header: {
+                Text("菜单栏")
+            } footer: {
+                Text("盖一层假菜单栏,只显示目标 App 的菜单(需要辅助功能权限)。舞台中它会盖住 Cyclo 自己的图标,请用 ⌃⌥⌘S 退出。")
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("调整目标窗口", isOn: scene.resizeWindow)
                 Picker("规格", selection: scene.windowPreset) {
                     ForEach(presetChoices, id: \.self) { Text($0.description).tag($0) }

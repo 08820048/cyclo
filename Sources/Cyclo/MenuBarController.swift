@@ -7,11 +7,13 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     private let controller: StageController
     private let preferences: Preferences
     private let openSettings: () -> Void
+    private let openGuide: () -> Void
 
-    init(controller: StageController, preferences: Preferences, openSettings: @escaping () -> Void) {
+    init(controller: StageController, preferences: Preferences, openSettings: @escaping () -> Void, openGuide: @escaping () -> Void) {
         self.controller = controller
         self.preferences = preferences
         self.openSettings = openSettings
+        self.openGuide = openGuide
         super.init()
         let menu = NSMenu()
         menu.delegate = self
@@ -117,6 +119,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
+        let guide = NSMenuItem(title: "使用引导…", action: #selector(showGuide), keyEquivalent: "")
+        guide.target = self
+        menu.addItem(guide)
         menu.addItem(NSMenuItem(title: "退出 Cyclo", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
@@ -129,6 +134,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleStage() { controller.toggle() }
     @objc private func toggleResize() { preferences.scene.resizeWindow.toggle() }
     @objc private func showSettings() { openSettings() }
+    @objc private func showGuide() { openGuide() }
 
     @objc private func choosePreset(_ sender: NSMenuItem) {
         guard let preset = sender.representedObject as? WindowPreset else { return }

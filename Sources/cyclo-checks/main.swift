@@ -50,6 +50,12 @@ do {
     let badBackdrop = SceneConfig.decode(#"{"backdrop": {"nope": {}}, "resizeWindow": false}"#.data(using: .utf8))
     check(badBackdrop.backdrop == .default && badBackdrop.resizeWindow == false, "unknown backdrop falls back without losing other keys")
     check(SceneConfig.decode(SceneConfig().encoded()).backdrop == .gradient(.dusk), "solid/gradient encode")
+    let old = SceneConfig.decode(#"{"hideDock": false, "resizeWindow": false}"#.data(using: .utf8))
+    check(old.cleanMenuBar && old.fixedStatus, "a config saved before the clean menu bar existed gets it on")
+    var bar = SceneConfig()
+    bar.cleanMenuBar = false
+    bar.fixedStatus = false
+    check(SceneConfig.decode(bar.encoded()) == bar, "menu bar options round trip")
 }
 
 // MARK: Geometry

@@ -7,6 +7,10 @@ public struct SceneConfig: Codable, Equatable {
     public var hideDock = true
     public var resizeWindow = true
     public var windowPreset = WindowPreset(width: 1440, height: 900)
+    /// Covers the real menu bar with one that only shows the target app's menus.
+    public var cleanMenuBar = true
+    /// On that menu bar, replace the clock and status icons with a fixed 9:41 and a full battery.
+    public var fixedStatus = true
     /// Names of Shortcuts that turn Do Not Disturb on / off. Empty means skip.
     public var focusOnShortcut = ""
     public var focusOffShortcut = ""
@@ -14,7 +18,7 @@ public struct SceneConfig: Codable, Equatable {
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case backdrop, hideOtherApps, hideDock, resizeWindow, windowPreset, focusOnShortcut, focusOffShortcut
+        case backdrop, hideOtherApps, hideDock, resizeWindow, windowPreset, cleanMenuBar, fixedStatus, focusOnShortcut, focusOffShortcut
     }
 
     // Missing keys fall back to defaults, so adding a setting never wipes a saved configuration.
@@ -26,6 +30,8 @@ public struct SceneConfig: Codable, Equatable {
         hideDock = try c.decodeIfPresent(Bool.self, forKey: .hideDock) ?? d.hideDock
         resizeWindow = try c.decodeIfPresent(Bool.self, forKey: .resizeWindow) ?? d.resizeWindow
         windowPreset = (try? c.decodeIfPresent(WindowPreset.self, forKey: .windowPreset)) ?? d.windowPreset
+        cleanMenuBar = try c.decodeIfPresent(Bool.self, forKey: .cleanMenuBar) ?? d.cleanMenuBar
+        fixedStatus = try c.decodeIfPresent(Bool.self, forKey: .fixedStatus) ?? d.fixedStatus
         focusOnShortcut = try c.decodeIfPresent(String.self, forKey: .focusOnShortcut) ?? d.focusOnShortcut
         focusOffShortcut = try c.decodeIfPresent(String.self, forKey: .focusOffShortcut) ?? d.focusOffShortcut
     }
