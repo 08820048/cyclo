@@ -11,6 +11,10 @@ public struct SceneConfig: Codable, Equatable {
     public var keepOnlyFrontWindow = false
     /// Shows a ring where the mouse clicks.
     public var highlightClicks = false
+    /// Shows shortcuts and special keys (⌘C, esc, arrows) as keycaps.
+    public var showKeys = false
+    /// Also shows plain typing. Off by default: a recording may catch a password or a private message.
+    public var showTypedKeys = false
     /// Covers the real menu bar with one that only shows the target app's menus.
     public var cleanMenuBar = true
     /// On that menu bar, replace the clock and status icons with a fixed 9:41 and a full battery.
@@ -22,7 +26,7 @@ public struct SceneConfig: Codable, Equatable {
     public init() {}
 
     enum CodingKeys: String, CodingKey {
-        case backdrop, hideOtherApps, hideDock, resizeWindow, windowPreset, keepOnlyFrontWindow, highlightClicks, cleanMenuBar, fixedStatus, focusOnShortcut, focusOffShortcut
+        case backdrop, hideOtherApps, hideDock, resizeWindow, windowPreset, keepOnlyFrontWindow, highlightClicks, showKeys, showTypedKeys, cleanMenuBar, fixedStatus, focusOnShortcut, focusOffShortcut
     }
 
     // Missing keys fall back to defaults, so adding a setting never wipes a saved configuration.
@@ -36,6 +40,8 @@ public struct SceneConfig: Codable, Equatable {
         windowPreset = (try? c.decodeIfPresent(WindowPreset.self, forKey: .windowPreset)) ?? d.windowPreset
         keepOnlyFrontWindow = try c.decodeIfPresent(Bool.self, forKey: .keepOnlyFrontWindow) ?? d.keepOnlyFrontWindow
         highlightClicks = try c.decodeIfPresent(Bool.self, forKey: .highlightClicks) ?? d.highlightClicks
+        showKeys = try c.decodeIfPresent(Bool.self, forKey: .showKeys) ?? d.showKeys
+        showTypedKeys = try c.decodeIfPresent(Bool.self, forKey: .showTypedKeys) ?? d.showTypedKeys
         cleanMenuBar = try c.decodeIfPresent(Bool.self, forKey: .cleanMenuBar) ?? d.cleanMenuBar
         fixedStatus = try c.decodeIfPresent(Bool.self, forKey: .fixedStatus) ?? d.fixedStatus
         focusOnShortcut = try c.decodeIfPresent(String.self, forKey: .focusOnShortcut) ?? d.focusOnShortcut

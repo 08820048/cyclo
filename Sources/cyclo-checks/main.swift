@@ -51,12 +51,37 @@ do {
     check(badBackdrop.backdrop == .default && badBackdrop.resizeWindow == false, "unknown backdrop falls back without losing other keys")
     check(SceneConfig.decode(SceneConfig().encoded()).backdrop == .gradient(.dusk), "solid/gradient encode")
     let old = SceneConfig.decode(#"{"hideDock": false, "resizeWindow": false}"#.data(using: .utf8))
+    check(old.showKeys == false && old.showTypedKeys == false, "key display is off for an old config")
     check(old.highlightClicks == false && old.keepOnlyFrontWindow == false, "new overlays and window changes are off for an old config")
     check(old.cleanMenuBar && old.fixedStatus, "a config saved before the clean menu bar existed gets it on")
     var bar = SceneConfig()
     bar.cleanMenuBar = false
     bar.fixedStatus = false
     check(SceneConfig.decode(bar.encoded()) == bar, "menu bar options round trip")
+}
+
+// MARK: KeyLabel
+
+do {
+    func caps(_ code: UInt16, _ char: String?, _ mods: KeyModifiers = [], typing: Bool = false) -> [String]? {
+        KeyLabel.keycaps(keyCode: code, character: char, modifiers: mods, typing: typing)
+    }
+    check(caps(8, "c", [.command]) == ["⌘", "c".uppercased()], "⌘C")
+    check(caps(21, "4", [.command, .shift]) == ["⇧", "⌘", "4"], "⇧⌘4, modifiers in system order")
+    check(caps(1, "s", [.control, .option, .command]) == ["⌃", "⌥", "⌘", "S"], "⌃⌥⌘S")
+    check(caps(0, "a") == nil, "plain typing hidden by default")
+    check(caps(0, "a", [.shift]) == nil, "shift-letter is still typing")
+    check(caps(0, "a", typing: true) == ["A"], "plain typing shown when asked")
+    check(caps(53, nil) == ["esc"], "esc shown alone")
+    check(caps(123, nil) == ["←"], "arrow shown alone")
+    check(caps(126, nil, [.command]) == ["⌘", "↑"], "⌘↑")
+    check(caps(49, " ") == nil, "bare space is typing")
+    check(caps(49, " ", [.command]) == ["⌘", "Space"], "⌘Space")
+    check(caps(36, "\r", typing: true) == ["↩"], "return shown while typing is shown")
+    check(caps(51, nil) == nil, "bare delete is typing")
+    check(caps(200, nil) == nil, "unknown key without a character is ignored")
+    check(caps(200, "\u{1}") == nil, "control characters are ignored")
+    check(caps(122, nil) == ["F1"], "function key")
 }
 
 // MARK: SceneLibrary

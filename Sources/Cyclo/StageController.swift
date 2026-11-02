@@ -16,6 +16,7 @@ final class StageController {
     private let backdrop = BackdropWindows()
     private let menuBarCover = MenuBarCover()
     private let clickHighlighter = ClickHighlighter()
+    private let keyDisplay = KeyDisplay()
     private var journal: SessionJournal?
     private var stagedWindow: AXUIElement?
     private var askedForAccessibility = false
@@ -106,6 +107,7 @@ final class StageController {
 
         // Last, so the menus it reads are the target's, after everything else has settled.
         if config.cleanMenuBar, let target {
+            menuBarCover.onExit = { [weak self] in Task { @MainActor in self?.exit() } }  // not inside the cover's own mouse event
             menuBarCover.show(.init(appName: target.localizedName ?? "", menus: MenuBarCover.menuTitles(of: target.processIdentifier),
                                     backdrop: config.backdrop, fixedStatus: config.fixedStatus))
             if !WindowSizer.isTrusted { notes.append("菜单栏只显示了 App 名:授予辅助功能权限后才能显示完整菜单") }
@@ -113,6 +115,13 @@ final class StageController {
 
         // Created after the menu bar cover so its rings are drawn above it. It only overlays; nothing to restore.
         if config.highlightClicks { clickHighlighter.start() }
+        if config.showKeys {
+            if !KeyDisplay.hasPermission {
+                KeyDisplay.requestPermission()
+                notes.append("按键显示:需要在 系统设置 › 隐私与安全性 › 输入监控 中允许 Cyclo,授权后重新进入舞台")
+            }
+            keyDisplay.start(typing: config.showTypedKeys)
+        }
 
         target?.activate()
         onChange?()
@@ -123,6 +132,7 @@ final class StageController {
         guard isActive || journal != nil else { return }
         let target = journal?.targetPID.flatMap { NSRunningApplication(processIdentifier: $0) }
         if let journal { Self.restore(journal, window: stagedWindow, waiting: waiting) }
+        keyDisplay.stop()
         clickHighlighter.stop()
         menuBarCover.hide()
         backdrop.hide()
@@ -147,6 +157,7 @@ final class StageController {
         if isActive {
             let scene = preferences.scene
             backdrop.update(scene.backdrop)
+            if keyDisplay.isRunning { keyDisplay.updateTyping(scene.showTypedKeys) }
             if menuBarCover.isShowing { menuBarCover.update(backdrop: scene.backdrop, fixedStatus: scene.fixedStatus) }
         }
         onChange?()

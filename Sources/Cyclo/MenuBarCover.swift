@@ -11,6 +11,8 @@ final class MenuBarCover {
     private var panels: [NSPanel] = []
     private var content: Content?
     private var screenObserver: NSObjectProtocol?
+    /// Called by ⌥-click or the right-click menu: the cover hides Cyclo's own menu bar icon, so it offers a way out.
+    var onExit: (() -> Void)?
 
     struct Content: Equatable {
         var appName: String
@@ -65,7 +67,8 @@ final class MenuBarCover {
             panel.backgroundColor = .black
             panel.hidesOnDeactivate = false
             panel.animationBehavior = .none
-            panel.contentView = NSHostingView(rootView: MenuBarCoverView(content: content, screenSize: screen.frame.size, barHeight: height))
+            let hosting = NSHostingView(rootView: MenuBarCoverView(content: content, screenSize: screen.frame.size, barHeight: height))
+            panel.contentView = ExitCatcherView(content: hosting) { [weak self] in self?.onExit?() }
             panel.setFrame(frame, display: false)
             panel.orderFront(nil)
             return panel
@@ -96,6 +99,36 @@ final class MenuBarCover {
             return (title as? String).flatMap { $0.isEmpty ? nil : $0 }
         }
     }
+}
+
+/// Holds the cover's content and turns ⌥-click and right-click into a way to end the stage.
+private final class ExitCatcherView: NSView {
+    private let onExit: () -> Void
+
+    init(content: NSView, onExit: @escaping () -> Void) {
+        self.onExit = onExit
+        super.init(frame: .zero)
+        content.frame = bounds
+        content.autoresizingMask = [.width, .height]
+        addSubview(content)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.option) { onExit() }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "退出舞台", action: #selector(exitStage), keyEquivalent: "s")
+        item.keyEquivalentModifierMask = [.control, .option, .command]
+        item.target = self
+        menu.addItem(item)
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func exitStage() { onExit() }
 }
 
 private struct MenuBarCoverView: View {

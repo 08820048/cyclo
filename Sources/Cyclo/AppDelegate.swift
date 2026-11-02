@@ -8,7 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menuBar: MenuBarController?
     private var hotKey: HotKey?
     private var sceneHotKeys: [HotKey] = []
-    private lazy var settings = SettingsWindowController(preferences: preferences)
+    private lazy var settings = SettingsWindowController(preferences: preferences, openGuide: { [weak self] in self?.onboarding.show() })
     private let onboarding = OnboardingWindowController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
