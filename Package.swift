@@ -10,3 +10,4 @@ let package = Package(
         .executableTarget(name: "cyclo-checks", dependencies: ["CycloCore"], swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )
+

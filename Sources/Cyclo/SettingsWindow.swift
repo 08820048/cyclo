@@ -18,9 +18,12 @@ final class SettingsWindowController {
         if window == nil {
             let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView(preferences: preferences, openGuide: openGuide)))
             window.title = "Cyclo 设置"
-            window.styleMask = [.titled, .closable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
+            window.setContentSize(NSSize(width: 780, height: 540))
+            window.isMovableByWindowBackground = true
+            window.setFrameAutosaveName("CycloSettings")  // remembers the size and place the user chose
             window.isReleasedWhenClosed = false
-            window.center()
+            if !window.setFrameUsingName("CycloSettings") { window.center() }
             self.window = window
         }
         NSApp.activate()
@@ -31,7 +34,7 @@ final class SettingsWindowController {
 
 // MARK: Layout
 
-/// A sidebar of pages in a window of fixed size: adding a setting grows a page's scroll area, never the window.
+/// A sidebar of pages: adding a setting grows a page's scroll area, never the window.
 private enum Page: String, CaseIterable, Identifiable {
     case scenes = "场景", look = "外观", window = "窗口", environment = "环境", recording = "录屏辅助", general = "通用"
     var id: String { rawValue }
@@ -57,38 +60,30 @@ struct SettingsView: View {
     @State private var page: Page = .scenes
 
     var body: some View {
-        HStack(spacing: 0) {
+        // The system's own split view: the sidebar floats and takes the glass look, and the toolbar
+        // merges with the title bar. Hand-built stacks get none of that.
+        NavigationSplitView {
             List(Page.allCases, selection: $page) { page in
                 Label(page.rawValue, systemImage: page.symbol).tag(page)
             }
-            .listStyle(.sidebar)
-            .frame(width: 168)
-
-            Divider()
-
-            VStack(spacing: 0) {
-                if page.isPerScene { sceneBar }
-                detail.frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 220)
+        } detail: {
+            detail
+                .navigationTitle(page.rawValue)
+                .toolbar {
+                    // Everything on a per-scene page applies to one scene; this says which, and switches it.
+                    if page.isPerScene {
+                        ToolbarItem(placement: .primaryAction) {
+                            Picker("场景", selection: Binding(get: { preferences.library.selectedID }, set: { preferences.select($0) })) {
+                                ForEach(preferences.library.scenes) { Text($0.name).tag($0.id) }
+                            }
+                            .pickerStyle(.menu)
+                            .help("当前场景")
+                        }
+                    }
+                }
         }
-        .frame(width: 760, height: 520)
-    }
-
-    /// Everything on a per-scene page applies to one scene; this says which, and switches it.
-    private var sceneBar: some View {
-        HStack {
-            Text("当前场景").foregroundStyle(.secondary)
-            Picker("当前场景", selection: Binding(get: { preferences.library.selectedID }, set: { preferences.select($0) })) {
-                ForEach(preferences.library.scenes) { Text($0.name).tag($0.id) }
-            }
-            .labelsHidden()
-            .fixedSize()
-            Spacer()
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
+        .frame(minWidth: 680, minHeight: 440)
     }
 
     @ViewBuilder private var detail: some View {
