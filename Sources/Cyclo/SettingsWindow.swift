@@ -40,6 +40,25 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("场景", selection: Binding(get: { preferences.library.selectedID }, set: { preferences.select($0) })) {
+                    ForEach(preferences.library.scenes) { entry in
+                        Text(sceneTitle(entry)).tag(entry.id)
+                    }
+                }
+                TextField("名称", text: Binding(get: { preferences.library.selected.name }, set: { preferences.renameSelectedScene(to: $0) }))
+                HStack {
+                    Button("复制为新场景") { preferences.addScene() }
+                    Button("删除此场景", role: .destructive) { preferences.removeSelectedScene() }
+                        .disabled(preferences.library.scenes.count < 2)
+                }
+            } header: {
+                Text("场景")
+            } footer: {
+                Text("下面的所有设置都属于当前场景。⌃⌥⌘1–9 直接进入对应序号的场景,舞台中再按一次退出。")
+                    .foregroundStyle(.secondary)
+            }
+
             Section("背景") {
                 Picker("类型", selection: kind) {
                     ForEach(BackdropKind.allCases) { Text($0.rawValue).tag($0) }
@@ -49,6 +68,10 @@ struct SettingsView: View {
                 BackdropView(backdrop: preferences.scene.backdrop)
                     .frame(height: 90)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            Section("录屏辅助") {
+                Toggle("高亮鼠标点击", isOn: scene.highlightClicks)
             }
 
             Section("清理") {
@@ -68,6 +91,7 @@ struct SettingsView: View {
             }
 
             Section {
+                Toggle("只保留前台窗口", isOn: scene.keepOnlyFrontWindow)
                 Toggle("调整目标窗口", isOn: scene.resizeWindow)
                 Picker("规格", selection: scene.windowPreset) {
                     ForEach(presetChoices, id: \.self) { Text($0.description).tag($0) }
@@ -105,7 +129,7 @@ struct SettingsView: View {
             }
 
             Section("快捷键") {
-                LabeledContent("进入 / 退出舞台", value: "⌃⌥⌘S")
+                LabeledContent("进入 / 退出当前场景", value: "⌃⌥⌘S")
             }
         }
         .formStyle(.grouped)
@@ -114,6 +138,10 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             trusted = WindowSizer.isTrusted
         }
+    }
+
+    private func sceneTitle(_ entry: NamedScene) -> String {
+        preferences.library.shortcutNumber(of: entry.id).map { "\(entry.name)  ⌃⌥⌘\($0)" } ?? entry.name
     }
 
     @ViewBuilder private var backdropDetail: some View {

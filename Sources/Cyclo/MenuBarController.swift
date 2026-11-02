@@ -83,6 +83,19 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
 
+        let scenes = NSMenu()
+        let library = preferences.library
+        for (index, entry) in library.scenes.enumerated() {
+            let number = index + 1
+            let sceneItem = NSMenuItem(title: entry.name, action: #selector(chooseScene(_:)), keyEquivalent: number <= SceneLibrary.shortcutCount ? "\(number)" : "")
+            sceneItem.keyEquivalentModifierMask = [.control, .option, .command]
+            sceneItem.target = self
+            sceneItem.representedObject = entry.id
+            sceneItem.state = entry.id == library.selectedID ? .on : .off
+            scenes.addItem(sceneItem)
+        }
+        addSubmenu("场景:\(library.selected.name)", scenes, to: menu)
+
         let sizes = NSMenu()
         let resize = NSMenuItem(title: "调整目标窗口", action: #selector(toggleResize), keyEquivalent: "")
         resize.target = self
@@ -134,6 +147,11 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     @objc private func toggleStage() { controller.toggle() }
     @objc private func toggleResize() { preferences.scene.resizeWindow.toggle() }
     @objc private func showSettings() { openSettings() }
+    @objc private func chooseScene(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        controller.switchScene(to: id)
+    }
+
     @objc private func showGuide() { openGuide() }
 
     @objc private func choosePreset(_ sender: NSMenuItem) {

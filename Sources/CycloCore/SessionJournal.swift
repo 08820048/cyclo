@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 /// Everything needed to undo a stage. Written to disk *before* each change, so a crash
@@ -12,11 +13,55 @@ public struct SessionJournal: Codable, Equatable {
     public var window: WindowSnapshot?
     /// The Shortcut to run on exit, if the stage ran one on entry.
     public var focusOffShortcut: String?
+    /// Target-app windows the stage minimized, to bring back on exit.
+    public var minimizedWindows: [MinimizedWindow] = []
 
     public init(startedAt: Date, targetBundleID: String? = nil, targetPID: Int32? = nil) {
         self.startedAt = startedAt
         self.targetBundleID = targetBundleID
         self.targetPID = targetPID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case startedAt, targetBundleID, targetPID, hiddenApps, dockAutohideWas, window, focusOffShortcut, minimizedWindows
+    }
+
+    // A journal written by an older version must still decode, or its stage could never be undone.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        startedAt = try c.decode(Date.self, forKey: .startedAt)
+        targetBundleID = try c.decodeIfPresent(String.self, forKey: .targetBundleID)
+        targetPID = try c.decodeIfPresent(Int32.self, forKey: .targetPID)
+        hiddenApps = try c.decodeIfPresent([HiddenApp].self, forKey: .hiddenApps) ?? []
+        dockAutohideWas = try c.decodeIfPresent(Bool.self, forKey: .dockAutohideWas)
+        window = try c.decodeIfPresent(WindowSnapshot.self, forKey: .window)
+        focusOffShortcut = try c.decodeIfPresent(String.self, forKey: .focusOffShortcut)
+        minimizedWindows = try c.decodeIfPresent([MinimizedWindow].self, forKey: .minimizedWindows) ?? []
+    }
+}
+
+/// A window the stage minimized. An Accessibility element cannot be saved, so after a crash the
+/// window is found again by its title and frame (a minimized window keeps its frame).
+public struct MinimizedWindow: Codable, Equatable {
+    public var pid: Int32
+    public var title: String
+    public var x: Double
+    public var y: Double
+    public var width: Double
+    public var height: Double
+
+    public init(pid: Int32, title: String, origin: CGPoint, size: CGSize) {
+        self.pid = pid
+        self.title = title
+        x = origin.x
+        y = origin.y
+        width = size.width
+        height = size.height
+    }
+
+    public func matches(title: String, origin: CGPoint, size: CGSize, tolerance: Double = 2) -> Bool {
+        self.title == title && abs(x - origin.x) <= tolerance && abs(y - origin.y) <= tolerance
+            && abs(width - size.width) <= tolerance && abs(height - size.height) <= tolerance
     }
 }
 

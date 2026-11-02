@@ -56,7 +56,58 @@ enum WindowSizer {
         set(window, size: snapshot.size)
     }
 
+    /// The target's other standard, visible windows, with how to find each again.
+    static func otherWindows(of pid: pid_t, keeping front: AXUIElement) -> [(element: AXUIElement, record: MinimizedWindow)] {
+        let app = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(app, 0.5)
+        return windows(of: app).compactMap { window in
+            guard !CFEqual(window, front), bool(window, kAXMinimizedAttribute) == false,
+                  string(window, kAXSubroleAttribute) == kAXStandardWindowSubrole,
+                  let origin = point(window, kAXPositionAttribute), let size = size(window) else { return nil }
+            return (window, MinimizedWindow(pid: pid, title: string(window, kAXTitleAttribute) ?? "", origin: origin, size: size))
+        }
+    }
+
+    static func minimize(_ window: AXUIElement) {
+        AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+    }
+
+    /// Brings back windows `minimize` took away; ones the user already restored or closed are skipped.
+    static func unminimize(_ records: [MinimizedWindow]) {
+        for pid in Set(records.map(\.pid)) {
+            let app = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(app, 0.5)
+            let wanted = records.filter { $0.pid == pid }
+            for window in windows(of: app) where bool(window, kAXMinimizedAttribute) == true {
+                guard let origin = point(window, kAXPositionAttribute), let size = size(window) else { continue }
+                let title = string(window, kAXTitleAttribute) ?? ""
+                if wanted.contains(where: { $0.matches(title: title, origin: origin, size: size) }) {
+                    AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                }
+            }
+        }
+    }
+
     // MARK: AX values
+
+    private static func windows(of app: AXUIElement) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
+    }
+
+    private static func bool(_ element: AXUIElement, _ attribute: String) -> Bool? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? Bool
+    }
+
+    private static func string(_ element: AXUIElement, _ attribute: String) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success else { return nil }
+        return value as? String
+    }
+
 
     private static func point(_ element: AXUIElement, _ attribute: String) -> CGPoint? {
         var value: CFTypeRef?

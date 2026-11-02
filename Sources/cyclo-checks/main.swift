@@ -51,11 +51,43 @@ do {
     check(badBackdrop.backdrop == .default && badBackdrop.resizeWindow == false, "unknown backdrop falls back without losing other keys")
     check(SceneConfig.decode(SceneConfig().encoded()).backdrop == .gradient(.dusk), "solid/gradient encode")
     let old = SceneConfig.decode(#"{"hideDock": false, "resizeWindow": false}"#.data(using: .utf8))
+    check(old.highlightClicks == false && old.keepOnlyFrontWindow == false, "new overlays and window changes are off for an old config")
     check(old.cleanMenuBar && old.fixedStatus, "a config saved before the clean menu bar existed gets it on")
     var bar = SceneConfig()
     bar.cleanMenuBar = false
     bar.fixedStatus = false
     check(SceneConfig.decode(bar.encoded()) == bar, "menu bar options round trip")
+}
+
+// MARK: SceneLibrary
+
+do {
+    var config = SceneConfig()
+    config.hideDock = false
+    let legacy = SceneLibrary.decode(library: nil, legacyScene: config.encoded())
+    check(legacy.scenes.count == 1 && legacy.selectedConfig == config, "an older single configuration becomes the first scene")
+    check(SceneLibrary.decode(library: nil, legacyScene: nil).scenes.count == 1, "fresh install gets one scene")
+    check(SceneLibrary.decode(library: Data("garbage".utf8), legacyScene: config.encoded()).selectedConfig == config, "unreadable library falls back to the old configuration")
+
+    var library = SceneLibrary()
+    let first = library.selected.id
+    library.selectedConfig.resizeWindow = false
+    let copy = library.duplicateSelected()
+    check(library.scenes.count == 2 && library.selectedID == copy.id, "duplicate adds and selects")
+    check(library.selectedConfig.resizeWindow == false, "the copy keeps the configuration")
+    library.selectedConfig.resizeWindow = true
+    library.select(first)
+    check(library.selectedConfig.resizeWindow == false, "editing the copy leaves the original alone")
+    check(library.duplicateSelected().name != copy.name, "duplicate names stay unique")
+    check(library.scene(forShortcut: 1)?.id == first && library.scene(forShortcut: 2)?.id == copy.id, "shortcut numbers follow the order")
+    check(library.scene(forShortcut: 0) == nil && library.scene(forShortcut: 9) == nil, "no scene for an empty shortcut")
+    check(library.shortcutNumber(of: copy.id) == 2, "shortcut number of a scene")
+    library.removeSelected()
+    check(library.scenes.count == 2 && library.scenes.contains { $0.id == library.selectedID }, "removing selects a neighbour")
+    library.removeSelected()
+    library.removeSelected()
+    check(library.scenes.count == 1, "the last scene cannot be removed")
+    check((try? JSONDecoder().decode(SceneLibrary.self, from: library.encoded()!)) == library, "library round trip")
 }
 
 // MARK: Geometry
@@ -93,12 +125,22 @@ do {
     journal.dockAutohideWas = false
     journal.window = WindowSnapshot(pid: 42, origin: CGPoint(x: 10, y: 40), size: CGSize(width: 800, height: 600))
     journal.focusOffShortcut = "勿扰关"
+    journal.minimizedWindows = [MinimizedWindow(pid: 42, title: "文档 1", origin: CGPoint(x: 5, y: 30), size: CGSize(width: 900, height: 700))]
     do {
         try store.save(journal)
         check(store.load() == journal, "journal round trip")
     } catch {
         check(false, "save failed: \(error)")
     }
+    // A journal from before minimized windows existed still has to load, or its stage could not be undone.
+    let legacy = #"{"startedAt":"2027-01-15T08:00:00Z","hiddenApps":[{"pid":7}],"dockAutohideWas":false}"#
+    try? FileManager.default.createDirectory(at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try? legacy.write(to: store.url, atomically: true, encoding: .utf8)
+    check(store.load()?.hiddenApps.count == 1 && store.load()?.minimizedWindows.isEmpty == true, "legacy journal loads")
+    let record = journal.minimizedWindows[0]
+    check(record.matches(title: "文档 1", origin: CGPoint(x: 6, y: 29), size: CGSize(width: 900, height: 700)), "minimized window matches within tolerance")
+    check(!record.matches(title: "文档 2", origin: CGPoint(x: 5, y: 30), size: CGSize(width: 900, height: 700)), "different title does not match")
+    check(!record.matches(title: "文档 1", origin: CGPoint(x: 50, y: 30), size: CGSize(width: 900, height: 700)), "different frame does not match")
     store.clear()
     check(store.load() == nil, "cleared")
     try? FileManager.default.removeItem(at: dir)

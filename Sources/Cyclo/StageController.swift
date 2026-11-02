@@ -15,6 +15,7 @@ final class StageController {
     private let store = JournalStore.default
     private let backdrop = BackdropWindows()
     private let menuBarCover = MenuBarCover()
+    private let clickHighlighter = ClickHighlighter()
     private var journal: SessionJournal?
     private var stagedWindow: AXUIElement?
     private var askedForAccessibility = false
@@ -25,6 +26,22 @@ final class StageController {
 
     func toggle() {
         isActive ? exit() : enter()
+    }
+
+    /// ⌃⌥⌘<number>: ends the stage if one is up, otherwise opens the scene at that position.
+    func toggle(sceneNumber: Int) {
+        if isActive { exit(); return }
+        guard let scene = preferences.library.scene(forShortcut: sceneNumber) else { return }
+        preferences.select(scene.id)
+        enter()
+    }
+
+    /// Switches scene; a stage that is up is redone with the new scene.
+    func switchScene(to id: UUID) {
+        let wasActive = isActive
+        if wasActive { exit() }
+        preferences.select(id)
+        if wasActive { enter() }
     }
 
     func enter() {
@@ -76,12 +93,26 @@ final class StageController {
             }
         }
 
+        if config.keepOnlyFrontWindow, let target, target.bundleIdentifier != "com.apple.finder" {
+            if !WindowSizer.isTrusted {
+                notes.append("未最小化其他窗口:需要在 系统设置 › 隐私与安全性 › 辅助功能 中允许 Cyclo")
+                if !askedForAccessibility { askedForAccessibility = true; WindowSizer.requestTrust() }
+            } else if let front = stagedWindow ?? WindowSizer.frontWindow(of: target.processIdentifier) {
+                let others = WindowSizer.otherWindows(of: target.processIdentifier, keeping: front)
+                record { $0.minimizedWindows = others.map(\.record) }
+                others.forEach { WindowSizer.minimize($0.element) }
+            }
+        }
+
         // Last, so the menus it reads are the target's, after everything else has settled.
         if config.cleanMenuBar, let target {
             menuBarCover.show(.init(appName: target.localizedName ?? "", menus: MenuBarCover.menuTitles(of: target.processIdentifier),
                                     backdrop: config.backdrop, fixedStatus: config.fixedStatus))
             if !WindowSizer.isTrusted { notes.append("菜单栏只显示了 App 名:授予辅助功能权限后才能显示完整菜单") }
         }
+
+        // Created after the menu bar cover so its rings are drawn above it. It only overlays; nothing to restore.
+        if config.highlightClicks { clickHighlighter.start() }
 
         target?.activate()
         onChange?()
@@ -92,6 +123,7 @@ final class StageController {
         guard isActive || journal != nil else { return }
         let target = journal?.targetPID.flatMap { NSRunningApplication(processIdentifier: $0) }
         if let journal { Self.restore(journal, window: stagedWindow, waiting: waiting) }
+        clickHighlighter.stop()
         menuBarCover.hide()
         backdrop.hide()
         store.clear()
@@ -122,6 +154,7 @@ final class StageController {
 
     /// Reverse order of `enter`.
     private static func restore(_ journal: SessionJournal, window: AXUIElement?, waiting: Bool) {
+        if !journal.minimizedWindows.isEmpty, WindowSizer.isTrusted { WindowSizer.unminimize(journal.minimizedWindows) }
         if let snapshot = journal.window, WindowSizer.isTrusted { WindowSizer.restore(snapshot, window: window) }
         if let was = journal.dockAutohideWas { DockController.setAutohide(was) }
         AppHider.unhide(journal.hiddenApps)
